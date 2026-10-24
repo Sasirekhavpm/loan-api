@@ -22,7 +22,8 @@ class LoanMasterViewSet(viewsets.ModelViewSet):
     DELETE /api/loans/{loan_no}/  -> delete
     GET    /api/loans/pending/    -> report of loans with outstanding pending amount
     """
-    queryset = LoanMaster.objects.all().order_by('-loan_date')
+    #queryset = LoanMaster.objects.all().order_by('-loan_date')
+    queryset = LoanMaster.objects.all().order_by('-loan_no')
     filter_backends = [filters.SearchFilter]
     search_fields = ['person_name', 'guarantor_name', 'loan_status']
 
@@ -49,6 +50,13 @@ class LoanMasterViewSet(viewsets.ModelViewSet):
         max_loan_no = LoanMaster.objects.aggregate(m=Max('loan_no'))['m'] or 0
         return Response({'next_loan_no': max_loan_no + 1})
 
+    def list(self, request, *args, **kwargs):
+      queryset = self.filter_queryset(self.get_queryset())
+      limit = request.query_params.get('limit')
+      if limit and limit.isdigit():
+          queryset = queryset[:int(limit)]
+      serializer = self.get_serializer(queryset, many=True)
+      return Response(serializer.data)
 
 class CollDataViewSet(viewsets.ModelViewSet):
     """
@@ -69,10 +77,16 @@ class CollDataViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
         loan_no = self.request.query_params.get('loan_no')
         coll_date = self.request.query_params.get('coll_date')
+        date_from = self.request.query_params.get('date_from')
+        date_to = self.request.query_params.get('date_to')
+    
+        if date_from:
+            queryset = queryset.filter(coll_date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(coll_date__lte=date_to)
         if loan_no:
             queryset = queryset.filter(loan_no=loan_no)
-        if coll_date:
-            queryset = queryset.filter(coll_date=coll_date)
+        
         return queryset
 
     # def perform_create(self, serializer):
